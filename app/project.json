@@ -63,6 +63,21 @@
     "graph_errors": "关系错误",
     "weight_errors": "重量差异",
     "child": "子单号",
-    "classes": "危险类组合"
+    "classes": "危险类组合",
+    "root": "主单号",
+    "member_count": "子树节点",
+    "evidence_fingerprint": "核验依据指纹",
+    "block_reasons": "阻断原因",
+    "confirmable": "可确认",
+    "status": "复核状态",
+    "evidence_version": "证据版本",
+    "reviewer": "复核人",
+    "confirmed_at": "确认时间",
+    "resign_required": "需重签",
+    "run_block_reasons": "封存级阻断",
+    "filename": "交接包",
+    "package_seq": "包序号",
+    "is_current": "当前版本",
+    "created_at": "生成时间"
   }
 }

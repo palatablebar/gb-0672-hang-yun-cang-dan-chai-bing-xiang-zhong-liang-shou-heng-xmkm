@@ -5,3 +5,11 @@ id是主单、分组单或箱货明细唯一字符串编号，parent为空表示
 危险品按明确分类与UN编号检查，3类与5.1类禁止同箱；未知分类和缺失编号需复核。此演示规则只覆盖文中三类，不替代运输合规审批。
 报关总量只汇总主单，与context.json内的申报件数、净重和毛重逐项比较。重复同值折叠，重复编号冲突全部隔离。原始计数=采纳+隔离+空行+重复表头+重复同值行。
 封存需所有图、重量、危险品和采信问题处理完毕。数值均Decimal，对外字符串保留精度，编号不转整数。
+
+## 复核与交接数据
+
+- evidence_fingerprint：单张主单子树证据（节点、重量核验、危险品、隔离、拆并边）规范化后的 SHA256，证据不变则指纹不变；补证后只有指纹变化的主单需要重签。
+- 复核状态三态：待复核、证据已确认、需重签。确认操作要求该主单 block_reasons 为空；封存只收 status=证据已确认 且指纹等于当前证据的主单。
+- 阻断分两层：主单级（WEIGHT_MISMATCH、INCOMPATIBLE、MISSING_UN、UNKNOWN_HAZARD 及归属该子树的采信隔离）与封存级（MISSING_PARENT、DEPENDENCY_CYCLE、DECLARATION_MISMATCH、ROW_NOT_BALANCED 及无法归属主单的隔离），后者不挂在任何主单名下。
+- evidence_versions 保留每次补证的源 sha256 与完整结果；handoff_packages 保留全部历史交接包及 is_current 指针，切换在单事务内完成，失败回滚、旧版可下载。
+- review_events 以 (run_id, request_token) 唯一约束实现幂等：同一复核重试原样返回首次响应，不生成第二套数据。

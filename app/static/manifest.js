@@ -6,3 +6,47 @@ if(filePicker){
  document.querySelector('#import-csv').addEventListener('click',async event=>{event.target.disabled=true;try{const response=await fetch('/api/runs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csv_text:editor.value})});const data=await response.json();if(!response.ok)throw Error(data.detail);location.href=location.pathname+'?run_id='+data.manifest.run_id;}catch(e){editor.setCustomValidity(e.message);editor.reportValidity();}finally{event.target.disabled=false;}});
  editor.addEventListener('input',()=>editor.setCustomValidity(''));
 }
+
+// 版本封存工作台：逐张主单复核、别单补证裁决、交接封存
+const workbench=document.querySelector('.worklist-panel');
+if(workbench){
+ const runId=document.body.dataset.runId;
+ const msg=document.querySelector('#review-message');
+ const revision=()=>Number(document.querySelector('.worklist-panel h2 small').dataset.revision);
+ const post=async(url,body)=>{
+   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const data=await response.json();
+   if(!response.ok)throw Error(data.detail||'操作失败');
+   return data;
+ };
+ document.querySelectorAll('.confirm-root').forEach(btn=>btn.addEventListener('click',async()=>{
+   btn.disabled=true;msg.textContent='提交中…';
+   try{
+     await post(`/api/runs/${runId}/roots/${btn.dataset.root}/confirm`,{revision:revision(),request_token:btn.dataset.root+':'+Date.now()});
+     location.reload();
+   }catch(e){msg.textContent=e.message;btn.disabled=false;}
+ }));
+ document.querySelector('#confirm-batch').addEventListener('click',async event=>{
+   event.target.disabled=true;msg.textContent='整批确认中…';
+   try{
+     await post(`/api/runs/${runId}/confirm-batch`,{revision:revision(),request_token:'batch:'+Date.now()});
+     location.reload();
+   }catch(e){msg.textContent=e.message;event.target.disabled=false;}
+ });
+ document.querySelector('#seal-handoff').addEventListener('click',async event=>{
+   event.target.disabled=true;msg.textContent='生成交接封存件…';
+   try{
+     await post(`/api/runs/${runId}/seal`,{revision:revision(),request_token:'seal:'+Date.now()});
+     location.reload();
+   }catch(e){msg.textContent=e.message;event.target.disabled=false;}
+ });
+ document.querySelector('#supplement-submit').addEventListener('click',async event=>{
+   const text=document.querySelector('#supplement-text').value.trim();
+   if(!text){msg.textContent='请粘贴补证后的完整 CSV';return;}
+   event.target.disabled=true;msg.textContent='补证裁决中…';
+   try{
+     await post(`/api/runs/${runId}/supplement`,{revision:revision(),csv_text:text,request_token:'supplement:'+Date.now()});
+     location.reload();
+   }catch(e){msg.textContent=e.message;event.target.disabled=false;}
+ });
+}

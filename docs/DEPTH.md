@@ -37,3 +37,15 @@
 ## 已知不覆盖
 
 数据来自仓内样例或用户粘贴文件，不连接外部业务生产系统。平台不执行实际资金划转或行政审批。
+
+## 逐张主单复核与交接封存（M7 扩展）
+
+| 能力 | 入口 | 核心文件 | 测试 |
+|---|---|---|---|
+| 逐主单证据指纹与阻断归因 | `GET /api/runs/{run_id}/worklist` | `app/review.py` | `tests/test_review_domain.py` |
+| 单张/整批确认（不重签未变主单） | `POST /api/runs/{run_id}/roots/{root_id}/confirm`、`/confirm-batch` | `app/store.py` | `tests/test_review_workflow.py` |
+| 补证裁决：选择性重签/整批重置 | `POST /api/runs/{run_id}/supplement` | `app/review.py::adjudicate` | `tests/test_review_workflow.py` |
+| 交接封存与版本原子切换 | `POST /api/runs/{run_id}/seal`、`GET /api/handoff/{run_id}` | `app/archive.py::build_handoff`、`app/store.py::seal_handoff` | `tests/test_handoff_atomicity.py` |
+| 幂等重试与并发冲突 | 全部写接口 `request_token`、`revision` | `app/store.py` | `tests/test_review_workflow.py`、`tests/test_handoff_atomicity.py` |
+
+裁决口径：证据按主单子树切分（重量核验、危险品、采信隔离各归其主；箱级不相容归因到使用该箱的主单；缺父级、依赖环、报关总量差异为封存级阻断）。补证后主单集合不变且指纹可逐张对账时，仅变化主单转“需重签”；主单集合变化或历史指纹缺失时整批转“待复核”，避免封存件引用说不清来源的依据。

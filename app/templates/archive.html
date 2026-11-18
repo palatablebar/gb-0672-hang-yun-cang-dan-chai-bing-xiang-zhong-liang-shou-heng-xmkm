@@ -1,1 +1,96 @@
-{% extends 'base.html' %}{% block content %}<div class="sheet-grid"><section class="panel index"><h2>装箱索引<sup>1</sup></h2>{% for root in state.graph.roots %}<details open><summary>{{ root }}</summary>{% for child in state.graph.children[root] %}<div class="branch">{{ child }}<small>{{ state.graph.children[child]|length }} 项</small></div>{% endfor %}</details>{% endfor %}</section><section class="panel data-panel"><h2>版本封存<sup>2</sup><small>{{ view.rows|length }} 条</small></h2>{{ records(view.rows) }}</section><div class="right-column"><section class="panel stamps"><h2>封存记录</h2><div class="stamp">{{ state.archive.status }}</div><div class="checksum">{{ state.archive.seal[:24] }}</div><a href="/api/export/{{ state.manifest.run_id }}">下载封存件</a></section><section class="panel"><h2>阻断凭据<sup>3</sup></h2>{{ records(state.hazard_issues+state.graph.errors) }}</section><section class="panel"><h2>采信隔离</h2>{{ records(state.quarantine) }}</section></div></div>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<div class="sheet-grid review-grid">
+  <section class="panel index">
+    <h2>装箱索引<sup>1</sup></h2>
+    {% for root in state.graph.roots %}
+    <details open><summary>{{ root }}</summary>
+      {% for child in state.graph.children[root] %}
+      <div class="branch">{{ child }}<small>{{ state.graph.children[child]|length }} 项</small></div>
+      {% endfor %}
+    </details>
+    {% endfor %}
+  </section>
+
+  <section class="panel data-panel worklist-panel">
+    <h2>可交接复核清单<sup>2</sup><small data-revision="{{ worklist.revision }}">证据版本 v{{ worklist.evidence_version }} · 修订 {{ worklist.revision }}</small></h2>
+    <div class="worklist-toolbar">
+      <button id="confirm-batch" class="primary">整批确认可签主单</button>
+      <button id="seal-handoff">生成交接封存件</button>
+      <output id="review-message" aria-live="polite"></output>
+    </div>
+    <div class="table-scroll">
+      <table class="worklist-table">
+        <thead><tr>
+          <th>主单号</th><th>复核状态</th><th>核验依据指纹</th><th>阻断原因</th><th>复核人/时间</th><th>操作</th>
+        </tr></thead>
+        <tbody>
+        {% for r in worklist.roots %}
+        <tr class="root-row status-{{ r.status }}" data-root="{{ r.root }}" data-fingerprint="{{ r.evidence_fingerprint }}">
+          <td class="root-id"><b>{{ r.root }}</b><small>{{ r.member_count }} 个节点 · 证据 v{{ r.evidence_version }}</small></td>
+          <td><span class="pill pill-{{ r.status }}">{{ r.status }}{% if r.resign_required %}（依据已变）{% endif %}</span></td>
+          <td class="num fingerprint" title="{{ r.evidence_fingerprint }}">{{ r.evidence_fingerprint[:16] }}…</td>
+          <td class="reasons">
+            {% if r.block_reasons %}
+              {% for b in r.block_reasons %}<div><code>{{ b.code }}</code> {{ b.detail }}</div>{% endfor %}
+            {% else %}<span class="muted">无阻断，证据可确认</span>{% endif %}
+          </td>
+          <td class="num">{% if r.reviewer %}{{ r.reviewer }}<small>{{ r.confirmed_at[:19] }}</small>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>
+            {% if r.confirmable %}
+            <button class="confirm-root" data-root="{{ r.root }}" {% if r.status=='证据已确认' and not r.resign_required %}disabled{% endif %}>
+              {{ '重签确认' if r.resign_required else '确认' }}
+            </button>
+            {% else %}<button disabled>阻断中</button>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if worklist.run_block_reasons %}
+    <div class="run-blocks">
+      <h3>封存级阻断（不归属单张主单）</h3>
+      {% for b in worklist.run_block_reasons %}<div><code>{{ b.code }}</code> {{ b.detail }}</div>{% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <div class="right-column">
+    <section class="panel stamps">
+      <h2>封存记录</h2>
+      <div class="stamp">{{ state.archive.status }}</div>
+      <div class="checksum">{{ state.archive.seal[:24] }}</div>
+      <a href="/api/handoff/{{ state.manifest.run_id }}">下载当前交接包</a>
+    </section>
+    <section class="panel">
+      <h2>交接包版本<sup>3</sup></h2>
+      {% if worklist.packages %}
+      {% for p in worklist.packages %}
+      <div class="package-line {% if p.is_current %}current{% endif %}">
+        <b>#{{ p.package_seq }}{% if p.is_current %} 当前{% endif %}</b>
+        <span class="num">{{ p.sha256[:16] }}…</span>
+        <a href="/api/runs/{{ state.manifest.run_id }}/packages/{{ p.id }}">下载</a>
+      </div>
+      {% endfor %}
+      {% else %}<div class="muted">尚无封存件，仅证据已确认的当前主单可进入。</div>{% endif %}
+    </section>
+    <section class="panel">
+      <h2>别单补证裁决</h2>
+      <details class="supplement-box">
+        <summary>对本批补充/替换源 CSV</summary>
+        <textarea id="supplement-text" placeholder="粘贴补充重量证据后的完整 CSV（字段顺序与原批一致）"></textarea>
+        <button id="supplement-submit">提交补证并裁决</button>
+        <div id="adjudication" class="adjudication">
+          {% if worklist.adjudication %}
+          <code>{{ worklist.adjudication.mode }}</code>
+          <p>{{ worklist.adjudication.reason }}</p>
+          {% if worklist.adjudication.changed_roots %}<p>变化主单：{{ worklist.adjudication.changed_roots|join('、') }}</p>{% endif %}
+          {% endif %}
+        </div>
+      </details>
+    </section>
+    <section class="panel"><h2>采信隔离</h2>{{ records(state.quarantine) }}</section>
+  </div>
+</div>
+{% endblock %}
